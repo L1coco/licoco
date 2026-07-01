@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>充电特典 - 梨可可的漫画站</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #fff0fb;
+      --card: rgba(255, 255, 255, 0.86);
+      --card-strong: rgba(255, 255, 255, 0.97);
+      --text: #4b244f;
+      --muted: #927091;
+      --primary: #d66fff;
+      --primary-strong: #b94deb;
+      --primary-dark: #8433b0;
+      --pink: #ff8bc9;
+      --pink-dark: #d95599;
+      --line: rgba(214, 111, 255, 0.28);
+      --danger: #ff668d;
+      --danger-dark: #d9416d;
+      --shadow: 0 20px 56px rgba(143, 57, 178, 0.16);
+      --radius: 24px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 8%, rgba(255, 139, 201, 0.48), transparent 28rem),
+        radial-gradient(circle at 90% 10%, rgba(214, 111, 255, 0.42), transparent 30rem),
+        linear-gradient(135deg, #fff8fd 0%, var(--bg) 50%, #f6e9ff 100%);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(176, 87, 206, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(176, 87, 206, 0.08) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent 72%);
+    }
+
+    .shell {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 0 48px;
+      position: relative;
+    }
+
+    .top-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      padding: 34px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hero::after {
+      content: "♡";
+      position: absolute;
+      right: 28px;
+      bottom: -28px;
+      color: rgba(214, 111, 255, 0.14);
+      font-size: 132px;
+      line-height: 1;
+      font-weight: 900;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 139, 201, 0.22);
+      color: var(--pink-dark);
+      font-size: 13px;
+      font-weight: 850;
+      border: 1px solid rgba(255, 139, 201, 0.34);
+    }
+
+    h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(34px, 5vw, 58px);
+      line-height: 1.04;
+    }
+
+    .subtitle {
+      margin: 0;
+      max-width: 720px;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 17px;
+    }
+
+    input, button {
+      font: inherit;
+    }
+
+    input[type="password"], input[type="text"], input[type="number"] {
+      width: 100%;
+      border: 1px solid rgba(214, 111, 255, 0.34);
+      border-radius: 16px;
+      padding: 13px 14px;
+      outline: none;
+      color: var(--text);
+      background: rgba(255,255,255,0.78);
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(214, 111, 255, 0.14);
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 16px;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--primary), var(--pink));
+      color: white;
+      font-weight: 850;
+      box-shadow: 0 10px 24px rgba(185, 77, 235, 0.2);
+      transition: 0.18s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn:hover { transform: translateY(-1px); filter: saturate(1.05); }
+    .btn:disabled { opacity: 0.52; cursor: not-allowed; transform: none; }
+
+    .btn.ghost {
+      background: rgba(255,255,255,0.76);
+      color: var(--primary-dark);
+      border: 1px solid rgba(214, 111, 255, 0.32);
+      box-shadow: none;
+    }
+
+    .btn.danger {
+      background: var(--danger);
+      box-shadow: 0 10px 24px rgba(255, 102, 141, 0.2);
+    }
+    .btn.danger:hover { background: var(--danger-dark); }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .gate {
+      padding: 26px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .gate.hide { display: none; }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .admin-tools {
+      padding: 24px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .admin-mode .admin-tools { display: block; }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .tool-box {
+      padding: 18px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.62);
+      border: 1px solid rgba(214, 111, 255, 0.18);
+    }
+
+    .tool-box h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 130px;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .hidden-input { display: none; }
+
+    .progress-wrap {
+      margin-top: 14px;
+      display: none;
+    }
+
+    .progress-wrap.show { display: block; }
+
+    .progress-bar {
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(214, 111, 255, 0.14);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--pink));
+      transition: width 0.2s ease;
+    }
+
+    .progress-text {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .content {
+      display: none;
+    }
+
+    .content.show { display: block; }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 18px;
+    }
+
+    .fan-card {
+      overflow: hidden;
+      border-radius: 22px;
+      background: var(--card-strong);
+      border: 1px solid rgba(214, 111, 255, 0.2);
+      box-shadow: 0 14px 34px rgba(143, 57, 178, 0.12);
+    }
+
+    .thumb {
+      width: 100%;
+      height: 260px;
+      display: block;
+      object-fit: cover;
+      background: linear-gradient(135deg, #ffe1f3, #f0d9ff);
+      cursor: zoom-in;
+    }
+
+    .meta {
+      padding: 13px 14px 15px;
+    }
+
+    .title {
+      margin: 0;
+      font-weight: 850;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .date {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .card-actions {
+      margin-top: 12px;
+      display: none;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .admin-mode .card-actions { display: flex; }
+
+    .small-btn {
+      border: 0;
+      cursor: pointer;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: rgba(214, 111, 255, 0.14);
+      color: var(--primary-dark);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .small-btn.danger { background: rgba(255, 102, 141, 0.16); color: var(--danger-dark); }
+
+    .empty {
+      grid-column: 1 / -1;
+      padding: 46px 20px;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(255,255,255,0.66);
+      border: 1px dashed rgba(214, 111, 255, 0.34);
+      border-radius: var(--radius);
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 22px;
+      background: rgba(62, 25, 75, 0.7);
+      z-index: 20;
+    }
+
+    .modal.show { display: grid; }
+
+    .modal-card {
+      width: min(960px, 100%);
+      max-height: 92vh;
+      border-radius: 22px;
+      background: white;
+      overflow: hidden;
+      box-shadow: 0 30px 90px rgba(0,0,0,0.35);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(214, 111, 255, 0.22);
+    }
+
+    .modal-body {
+      overflow: auto;
+      background: #fff5fd;
+      text-align: center;
+    }
+
+    .modal-body img {
+      max-width: 100%;
+      height: auto;
+      display: inline-block;
+      vertical-align: top;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(420px, calc(100% - 36px));
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(75, 36, 79, 0.94);
+      color: white;
+      box-shadow: 0 18px 48px rgba(0,0,0,0.22);
+      z-index: 30;
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: 0.22s ease;
+      line-height: 1.55;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    footer {
+      margin-top: 34px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 760px) {
+      .hero, .gate, .admin-tools { padding: 22px; }
+      .gate, .tool-grid, .form-row { grid-template-columns: 1fr; }
+      .gallery { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+      .thumb { height: 220px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell" id="app">
+    <div class="top-actions">
+      <a class="btn ghost" href="index.html">返回主页</a>
+      <a class="btn ghost" id="adminLoginLink" href="admin.html">管理员登录</a>
+    </div>
+
+    <section class="panel hero">
+      <span class="badge">Charge Fan Specials</span>
+      <h1>这里是充电特典哦(≧∇≦)ﾉ</h1>
+      <p class="subtitle">充电密码我放在充电动态里啦~输入密码就能进入这个神秘❤️小房间，可可酱真的很努力了，希望大家可以保持自觉，不要传播充电内容哦QAQ</p>
+    </section>
+
+    <form class="panel gate" id="gateForm">
+      <div class="field">
+        <label for="fanPassword">充电粉丝访问密码</label>
+        <input id="fanPassword" type="password" autocomplete="current-password" placeholder="请输入管理员设置的密码" required />
+      </div>
+      <button class="btn" id="enterBtn" type="submit">进入特典页</button>
+    </form>
+
+    <section class="panel admin-tools" id="adminTools">
+      <div class="tool-grid">
+        <div class="tool-box">
+          <h2>设置访问密码</h2>
+          <form id="passwordForm">
+            <div class="field">
+              <label for="newFanPassword">新密码</label>
+              <input id="newFanPassword" type="password" placeholder="至少 4 位" minlength="4" required />
+            </div>
+            <div class="btn-row" style="margin-top: 12px;">
+              <button class="btn" type="submit">保存密码</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="tool-box">
+          <h2>上传特典图片</h2>
+          <div class="form-row">
+            <div class="field">
+              <label for="uploadTitle">标题前缀</label>
+              <input id="uploadTitle" type="text" placeholder="可留空，默认文件名" />
+            </div>
+            <div class="field">
+              <label for="uploadOrder">起始排序</label>
+              <input id="uploadOrder" type="number" step="1" min="0" placeholder="自动" />
+            </div>
+          </div>
+          <input class="hidden-input" id="fileInput" type="file" accept="image/*" multiple />
+          <button class="btn" type="button" id="pickFilesBtn">选择图片</button>
+          <div class="progress-wrap" id="progressWrap">
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text" id="progressText">准备上传…</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content" id="content">
+      <section class="gallery" id="gallery" aria-live="polite"></section>
+    </section>
+
+    <footer>由梨可可酱努力制作(*╹▽╹*)</footer>
+  </main>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong id="modalTitle">预览</strong>
+        <button class="btn ghost" type="button" id="closeModalBtn">关闭</button>
+      </div>
+      <div class="modal-body">
+        <img id="modalImage" alt="特典图片预览" />
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SUPABASE_URL = "https://fviztitnwfgnejszmssl.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_QhZ98MFvnED8QMZcDmZJCg_XBKmcAOP";
+    const ADMIN_EMAIL = "2403981313@qq.com";
+    const BUCKET_NAME = "comics";
+    const TABLE_NAME = "fan_images";
+    const MAX_FILE_MB = 30;
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const app = document.querySelector("#app");
+    const adminLoginLink = document.querySelector("#adminLoginLink");
+    const gateForm = document.querySelector("#gateForm");
+    const fanPasswordInput = document.querySelector("#fanPassword");
+    const enterBtn = document.querySelector("#enterBtn");
+    const adminTools = document.querySelector("#adminTools");
+    const passwordForm = document.querySelector("#passwordForm");
+    const newFanPassword = document.querySelector("#newFanPassword");
+    const uploadTitle = document.querySelector("#uploadTitle");
+    const uploadOrder = document.querySelector("#uploadOrder");
+    const fileInput = document.querySelector("#fileInput");
+    const pickFilesBtn = document.querySelector("#pickFilesBtn");
+    const progressWrap = document.querySelector("#progressWrap");
+    const progressFill = document.querySelector("#progressFill");
+    const progressText = document.querySelector("#progressText");
+    const content = document.querySelector("#content");
+    const gallery = document.querySelector("#gallery");
+    const modal = document.querySelector("#modal");
+    const modalImage = document.querySelector("#modalImage");
+    const modalTitle = document.querySelector("#modalTitle");
+    const closeModalBtn = document.querySelector("#closeModalBtn");
+    const toast = document.querySelector("#toast");
+
+    let currentUser = null;
+    let fanImages = [];
+    let fanPassword = "";
+    let toastTimer = null;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 3600);
+    }
+
+    function isAdmin() {
+      return currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return "—";
+      const date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) return "—";
+      return date.toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    }
+
+    function sanitizeFileName(name) {
+      const fallback = "fan-special";
+      const cleaned = (name || fallback)
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9._-]/g, "_")
+        .replace(/_+/g, "_")
+        .slice(0, 80);
+      return cleaned || fallback;
+    }
+
+    function getNextSortOrder() {
+      const orders = fanImages.map(item => Number(item.sort_order)).filter(Number.isFinite);
+      return orders.length === 0 ? 10 : Math.max(...orders) + 10;
+    }
+
+    function unlockPage() {
+      gateForm.classList.add("hide");
+      content.classList.add("show");
+      window.location.hash = "specials";
+    }
+
+    function updateAdminUI() {
+      const admin = isAdmin();
+      app.classList.toggle("admin-mode", admin);
+      adminLoginLink.style.display = admin ? "none" : "inline-flex";
+      if (admin) {
+        unlockPage();
+      }
+    }
+
+    async function restoreSession() {
+      const { data, error } = await supabaseClient.auth.getSession();
+      if (error) {
+        console.warn(error);
+        return;
+      }
+      currentUser = data.session?.user || null;
+      if (currentUser && !isAdmin()) {
+        await supabaseClient.auth.signOut();
+        currentUser = null;
+      }
+      updateAdminUI();
+    }
+
+    async function loadFanImages() {
+      gallery.innerHTML = `<div class="empty">正在加载充电特典…</div>`;
+
+      let data;
+      let error;
+
+      if (isAdmin()) {
+        const result = await supabaseClient
+          .from(TABLE_NAME)
+          .select("id,title,file_path,public_url,sort_order,created_at")
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: false });
+        data = result.data;
+        error = result.error;
+      } else {
+        const result = await supabaseClient.rpc("get_fan_images", {
+          access_password: fanPassword
+        });
+        data = result.data;
+        error = result.error;
+      }
+
+      if (error) {
+        console.error(error);
+        gallery.innerHTML = `<div class="empty">读取失败：${error.message}<br>请确认已经运行新版 Supabase SQL。</div>`;
+        return;
+      }
+
+      fanImages = data || [];
+      renderFanImages();
+    }
+
+    function renderFanImages() {
+      gallery.innerHTML = "";
+
+      if (fanImages.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = isAdmin() ? "还没有特典图片。上传第一张吧。" : "这里暂时还没有特典图片。";
+        gallery.appendChild(empty);
+        return;
+      }
+
+      fanImages.forEach(item => {
+        const card = document.createElement("article");
+        card.className = "fan-card";
+
+        const img = document.createElement("img");
+        img.className = "thumb";
+        img.src = item.public_url;
+        img.alt = item.title || "充电特典图片";
+        img.loading = "lazy";
+        img.addEventListener("click", () => openModal(item));
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const title = document.createElement("p");
+        title.className = "title";
+        title.textContent = item.title || "未命名特典";
+
+        const date = document.createElement("p");
+        date.className = "date";
+        date.textContent = `上传于 ${formatDate(item.created_at)}`;
+
+        const actions = document.createElement("div");
+        actions.className = "card-actions";
+
+        const previewBtn = document.createElement("button");
+        previewBtn.className = "small-btn";
+        previewBtn.type = "button";
+        previewBtn.textContent = "预览";
+        previewBtn.addEventListener("click", () => openModal(item));
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "small-btn";
+        editBtn.type = "button";
+        editBtn.textContent = "编辑";
+        editBtn.addEventListener("click", () => editFanImage(item));
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "small-btn danger";
+        deleteBtn.type = "button";
+        deleteBtn.textContent = "删除";
+        deleteBtn.addEventListener("click", () => deleteFanImage(item));
+
+        actions.append(previewBtn, editBtn, deleteBtn);
+        meta.append(title, date, actions);
+        card.append(img, meta);
+        gallery.appendChild(card);
+      });
+    }
+
+    function openModal(item) {
+      modalTitle.textContent = item.title || "充电特典预览";
+      modalImage.src = item.public_url;
+      modalImage.alt = item.title || "充电特典预览";
+      modal.classList.add("show");
+    }
+
+    function closeModal() {
+      modal.classList.remove("show");
+      modalImage.removeAttribute("src");
+    }
+
+    async function updateFanImage(item, patch) {
+      if (!isAdmin()) {
+        showToast("只有管理员可以修改特典图片。");
+        return false;
+      }
+
+      const { error } = await supabaseClient
+        .from(TABLE_NAME)
+        .update(patch)
+        .eq("id", item.id);
+
+      if (error) {
+        console.error(error);
+        showToast("保存失败：" + error.message);
+        return false;
+      }
+
+      return true;
+    }
+
+    async function editFanImage(item) {
+      const title = prompt("图片标题", item.title || "");
+      if (title === null) return;
+
+      const orderInput = prompt("排序号（数字越小越靠前）", String(item.sort_order ?? getNextSortOrder()));
+      if (orderInput === null) return;
+
+      const sortOrder = Number.parseInt(orderInput, 10);
+      if (!Number.isFinite(sortOrder)) {
+        showToast("排序号需要填写数字。");
+        return;
+      }
+
+      const ok = await updateFanImage(item, {
+        title: title.trim() || item.title || "未命名特典",
+        sort_order: sortOrder
+      });
+
+      if (ok) {
+        showToast("特典信息已保存。");
+        await loadFanImages();
+      }
+    }
+
+    async function deleteFanImage(item) {
+      if (!isAdmin()) {
+        showToast("只有管理员可以删除特典图片。");
+        return;
+      }
+
+      const ok = confirm(`确定删除「${item.title || "这张特典图片"}」吗？`);
+      if (!ok) return;
+
+      const { error: storageError } = await supabaseClient.storage
+        .from(BUCKET_NAME)
+        .remove([item.file_path]);
+
+      if (storageError) {
+        console.error(storageError);
+        showToast("删除云端图片失败：" + storageError.message);
+        return;
+      }
+
+      const { error: deleteError } = await supabaseClient
+        .from(TABLE_NAME)
+        .delete()
+        .eq("id", item.id);
+
+      if (deleteError) {
+        console.error(deleteError);
+        showToast("删除数据库记录失败：" + deleteError.message);
+        return;
+      }
+
+      showToast("已删除特典图片。");
+      await loadFanImages();
+    }
+
+    async function uploadFiles(fileList) {
+      if (!isAdmin()) {
+        showToast("请先用管理员账号登录。");
+        return;
+      }
+
+      const files = Array.from(fileList || []).filter(file => file.type.startsWith("image/"));
+      if (files.length === 0) {
+        showToast("请选择图片文件。");
+        return;
+      }
+
+      progressWrap.classList.add("show");
+      progressFill.style.width = "0%";
+      progressText.textContent = `准备上传 ${files.length} 张图片…`;
+
+      let nextSortOrder = Number.parseInt(uploadOrder.value, 10);
+      if (!Number.isFinite(nextSortOrder)) {
+        nextSortOrder = getNextSortOrder();
+      }
+
+      let uploadedCount = 0;
+      let failedCount = 0;
+
+      for (const file of files) {
+        const sizeMb = file.size / 1024 / 1024;
+        if (sizeMb > MAX_FILE_MB) {
+          failedCount++;
+          showToast(`${file.name} 太大啦，单张图片建议小于 ${MAX_FILE_MB}MB。`);
+          continue;
+        }
+
+        const safeName = sanitizeFileName(file.name);
+        const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const day = new Date().toISOString().slice(0, 10);
+        const filePath = `fan-specials/${day}/${Date.now()}-${id}-${safeName}`;
+
+        progressText.textContent = `正在上传：${file.name}`;
+
+        const { error: uploadError } = await supabaseClient.storage
+          .from(BUCKET_NAME)
+          .upload(filePath, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type
+          });
+
+        if (uploadError) {
+          failedCount++;
+          console.error(uploadError);
+          showToast(`上传失败：${file.name}\n${uploadError.message}`);
+          continue;
+        }
+
+        const { data: publicUrlData } = supabaseClient.storage
+          .from(BUCKET_NAME)
+          .getPublicUrl(filePath);
+
+        const customTitle = uploadTitle.value.trim();
+        const { error: insertError } = await supabaseClient
+          .from(TABLE_NAME)
+          .insert({
+            title: customTitle ? `${customTitle} ${uploadedCount + 1}` : file.name,
+            file_path: filePath,
+            public_url: publicUrlData.publicUrl,
+            sort_order: nextSortOrder
+          });
+
+        if (insertError) {
+          failedCount++;
+          console.error(insertError);
+          showToast(`图片已上传，但记录保存失败：${file.name}\n${insertError.message}`);
+          continue;
+        }
+
+        uploadedCount++;
+        nextSortOrder += 10;
+        const percent = Math.round((uploadedCount + failedCount) / files.length * 100);
+        progressFill.style.width = `${percent}%`;
+        progressText.textContent = `已处理 ${uploadedCount + failedCount}/${files.length} 张`;
+      }
+
+      fileInput.value = "";
+      uploadOrder.value = String(nextSortOrder);
+      progressFill.style.width = "100%";
+      progressText.textContent = `完成：成功 ${uploadedCount} 张，失败 ${failedCount} 张`;
+      showToast(`上传完成：成功 ${uploadedCount} 张，失败 ${failedCount} 张。`);
+      await loadFanImages();
+    }
+
+    gateForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      enterBtn.disabled = true;
+      fanPassword = fanPasswordInput.value;
+
+      const { data, error } = await supabaseClient.rpc("verify_fan_password", {
+        access_password: fanPassword
+      });
+
+      if (error) {
+        console.error(error);
+        showToast("校验失败：" + error.message);
+        enterBtn.disabled = false;
+        return;
+      }
+
+      if (!data) {
+        showToast("密码不正确，或者管理员还没有设置密码。");
+        enterBtn.disabled = false;
+        return;
+      }
+
+      unlockPage();
+      showToast("欢迎进入充电特典页。");
+      await loadFanImages();
+      enterBtn.disabled = false;
+    });
+
+    passwordForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!isAdmin()) {
+        showToast("请先用管理员账号登录。");
+        return;
+      }
+
+      const { error } = await supabaseClient.rpc("set_fan_password", {
+        new_password: newFanPassword.value
+      });
+
+      if (error) {
+        console.error(error);
+        showToast("保存密码失败：" + error.message);
+        return;
+      }
+
+      newFanPassword.value = "";
+      showToast("充电粉丝访问密码已更新。");
+    });
+
+    pickFilesBtn.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", event => uploadFiles(event.target.files));
+    closeModalBtn.addEventListener("click", closeModal);
+    modal.addEventListener("click", event => {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeModal();
+    });
+
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+      currentUser = session?.user || null;
+      if (currentUser && !isAdmin()) {
+        await supabaseClient.auth.signOut();
+        currentUser = null;
+      }
+      updateAdminUI();
+      if (isAdmin()) await loadFanImages();
+    });
+
+    (async function init() {
+      await restoreSession();
+      if (isAdmin()) {
+        await loadFanImages();
+      }
+    })();
+  </script>
+</body>
+</html>

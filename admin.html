@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>管理员登录 - 梨可可的漫画站</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #eef8ff;
+      --card: rgba(255, 255, 255, 0.88);
+      --text: #1f3a4d;
+      --muted: #6a8aa0;
+      --primary: #68bdf2;
+      --primary-strong: #3499d8;
+      --primary-dark: #2577ad;
+      --line: rgba(105, 181, 230, 0.28);
+      --shadow: 0 18px 50px rgba(42, 122, 174, 0.16);
+      --radius: 24px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(154, 220, 255, 0.65), transparent 34rem),
+        radial-gradient(circle at top right, rgba(215, 241, 255, 0.9), transparent 28rem),
+        linear-gradient(135deg, #f7fcff 0%, var(--bg) 48%, #e5f5ff 100%);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .login-card {
+      width: min(440px, 100%);
+      padding: 28px;
+      border-radius: var(--radius);
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .badge {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(104, 189, 242, 0.17);
+      color: var(--primary-dark);
+      font-size: 13px;
+      font-weight: 800;
+      border: 1px solid rgba(104, 189, 242, 0.25);
+    }
+
+    h1 {
+      margin: 18px 0 10px;
+      font-size: 30px;
+      line-height: 1.1;
+    }
+
+    .tip {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .field label {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    input, button {
+      font: inherit;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid rgba(104, 189, 242, 0.3);
+      border-radius: 16px;
+      padding: 13px 14px;
+      outline: none;
+      color: var(--text);
+      background: rgba(255,255,255,0.78);
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px rgba(104, 189, 242, 0.16);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 16px;
+      padding: 12px 16px;
+      cursor: pointer;
+      background: var(--primary);
+      color: white;
+      font-weight: 850;
+      box-shadow: 0 10px 24px rgba(52, 153, 216, 0.22);
+      transition: 0.18s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn:hover { transform: translateY(-1px); background: var(--primary-strong); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn.ghost {
+      background: rgba(255,255,255,0.75);
+      color: var(--primary-dark);
+      border: 1px solid rgba(104, 189, 242, 0.32);
+      box-shadow: none;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      max-width: min(420px, calc(100% - 36px));
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(31, 58, 77, 0.94);
+      color: white;
+      box-shadow: 0 18px 48px rgba(0,0,0,0.22);
+      z-index: 30;
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: 0.22s ease;
+      line-height: 1.55;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <main class="login-card">
+    <span class="badge">Admin</span>
+    <h1>管理员登录</h1>
+    <p class="tip">是可可酱用来管理图片和网站的哦，同学们不需要登录qwq</p>
+
+    <form id="loginForm">
+      <div class="field">
+        <label for="email">邮箱</label>
+        <input id="email" type="email" autocomplete="email" value="" required />
+      </div>
+      <div class="field">
+        <label for="password">密码</label>
+        <input id="password" type="password" autocomplete="current-password" placeholder="输入密码" required />
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="loginBtn" type="submit">登录</button>
+        <a class="btn ghost" href="index.html">返回主页</a>
+      </div>
+    </form>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const SUPABASE_URL = "https://fviztitnwfgnejszmssl.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_QhZ98MFvnED8QMZcDmZJCg_XBKmcAOP";
+    const ADMIN_EMAIL = "2403981313@qq.com";
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const loginForm = document.querySelector("#loginForm");
+    const emailInput = document.querySelector("#email");
+    const passwordInput = document.querySelector("#password");
+    const loginBtn = document.querySelector("#loginBtn");
+    const toast = document.querySelector("#toast");
+
+    let toastTimer = null;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 3600);
+    }
+
+    function isAdmin(user) {
+      return user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+    }
+
+    loginForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      loginBtn.disabled = true;
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error) {
+        showToast("登录失败：" + error.message);
+        loginBtn.disabled = false;
+        return;
+      }
+
+      if (!isAdmin(data.user)) {
+        await supabaseClient.auth.signOut();
+        showToast("这个账号不是管理员账号，已自动退出。");
+        loginBtn.disabled = false;
+        return;
+      }
+
+      passwordInput.value = "";
+      showToast("登录成功，正在返回主页…");
+      setTimeout(() => {
+        window.location.href = "index.html";
+      }, 500);
+    });
+
+    (async function init() {
+      const { data } = await supabaseClient.auth.getSession();
+      if (isAdmin(data.session?.user)) {
+        window.location.href = "index.html";
+      }
+    })();
+  </script>
+</body>
+</html>

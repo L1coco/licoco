@@ -57,10 +57,7 @@
     }
 
     .hero {
-      display: grid;
-      grid-template-columns: 1.25fr 0.75fr;
-      gap: 24px;
-      align-items: stretch;
+      display: block;
       margin-bottom: 24px;
     }
 
@@ -145,19 +142,6 @@
       font-size: 13px;
     }
 
-    .admin-box {
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .admin-box h2 {
-      margin: 0;
-      font-size: 22px;
-      letter-spacing: -0.02em;
-    }
-
     .admin-tip {
       margin: 0;
       color: var(--muted);
@@ -181,7 +165,7 @@
       font: inherit;
     }
 
-    input[type="email"], input[type="password"], input[type="search"], input[type="text"] {
+    input[type="email"], input[type="password"], input[type="search"], input[type="text"], input[type="number"], select {
       width: 100%;
       border: 1px solid rgba(104, 189, 242, 0.3);
       border-radius: 16px;
@@ -192,7 +176,7 @@
       transition: 0.2s ease;
     }
 
-    input:focus {
+    input:focus, select:focus {
       border-color: var(--primary);
       box-shadow: 0 0 0 4px rgba(104, 189, 242, 0.16);
     }
@@ -253,10 +237,26 @@
     }
     .dot.online { background: #57d68d; box-shadow: 0 0 0 4px rgba(87, 214, 141, 0.14); }
 
+    .top-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .admin-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
     .toolbar {
       padding: 18px;
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: 1fr 190px auto auto;
       gap: 12px;
       align-items: center;
       margin-bottom: 18px;
@@ -289,6 +289,19 @@
 
     .dropzone h3 { margin: 0 0 8px; font-size: 22px; }
     .dropzone p { margin: 0 0 18px; color: var(--muted); }
+
+    .upload-options {
+      width: min(620px, 100%);
+      margin: 0 auto 18px;
+      display: grid;
+      grid-template-columns: 1fr 150px;
+      gap: 12px;
+      text-align: left;
+    }
+
+    .upload-options .field label {
+      color: var(--primary-dark);
+    }
 
     .hidden-input { display: none; }
 
@@ -360,6 +373,19 @@
       white-space: nowrap;
     }
 
+    .comic-badge {
+      display: inline-flex;
+      align-items: center;
+      max-width: 100%;
+      margin-bottom: 8px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(104, 189, 242, 0.14);
+      color: var(--primary-dark);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
     .comic-date {
       margin: 6px 0 0;
       color: var(--muted);
@@ -370,6 +396,7 @@
       margin-top: 12px;
       display: none;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .admin-mode .card-actions { display: flex; }
@@ -479,9 +506,9 @@
     }
 
     @media (max-width: 860px) {
-      .hero { grid-template-columns: 1fr; }
       .toolbar { grid-template-columns: 1fr; }
-      .intro, .admin-box, .upload-zone { padding: 22px; }
+      .upload-options { grid-template-columns: 1fr; }
+      .intro, .upload-zone { padding: 22px; }
       .gallery { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
       .thumb { height: 210px; }
     }
@@ -489,15 +516,26 @@
 </head>
 <body>
   <main class="shell" id="app">
+    <div class="top-actions">
+      <div class="status-pill" id="adminStatus"><span class="dot" id="loginDot"></span><span id="loginStatus">未登录</span></div>
+      <a class="btn ghost admin-link" href="fan.html">充电上二楼~❤️</a>
+      <a class="btn ghost admin-link" id="adminLoginLink" href="admin.html">管理员登录</a>
+      <button class="btn ghost" type="button" id="logoutBtn">退出</button>
+    </div>
+
     <section class="hero">
       <div class="panel intro">
         <div class="badge">💙 Cloud Comic Gallery</div>
         <h1>梨可可的漫画站</h1>
-        <p class="subtitle">这里是漫画图片展示页。读者可以浏览作品；管理员登录后可以上传新漫画，上传完成后所有人刷新网页都能看到。</p>
+        <p class="subtitle">大家好呀，因为邪恶的审核经常退回我的作品，所以我搭建了这个小站，这样大家就能更方便的看我的小短漫，不需要去网盘啦~(*^▽^*)</p>
         <div class="stats">
           <div class="stat">
             <strong id="comicCount">0</strong>
             <span>已发布图片</span>
+          </div>
+          <div class="stat">
+            <strong id="collectionCount">0</strong>
+            <span>图片合集</span>
           </div>
           <div class="stat">
             <strong id="latestDate">—</strong>
@@ -505,35 +543,25 @@
           </div>
         </div>
       </div>
-
-      <aside class="panel admin-box">
-        <h2>管理员入口</h2>
-        <p class="admin-tip">只有指定管理员邮箱可以上传或删除。读者打开网页时只会看到漫画展示区。</p>
-        <div class="status-pill"><span class="dot" id="loginDot"></span><span id="loginStatus">未登录</span></div>
-
-        <form id="loginForm">
-          <div class="field">
-            <label for="email">邮箱</label>
-            <input id="email" type="email" autocomplete="email" value="2403981313@qq.com" required />
-          </div>
-          <div class="field" style="margin-top: 10px;">
-            <label for="password">密码</label>
-            <input id="password" type="password" autocomplete="current-password" placeholder="输入 Supabase 用户密码" required />
-          </div>
-          <div class="btn-row" style="margin-top: 14px;">
-            <button class="btn" type="submit">登录上传</button>
-            <button class="btn ghost" type="button" id="logoutBtn">退出</button>
-          </div>
-        </form>
-      </aside>
     </section>
 
     <section class="panel upload-zone" id="uploadZone">
       <div class="dropzone" id="dropzone">
         <h3>上传漫画图片</h3>
-        <p>把图片拖到这里，或者点击按钮选择文件。支持多张图片。</p>
+        <p>把图片拖到这里，或者点击按钮选择文件。支持多张图片，可先设置合集和排序。</p>
+        <div class="upload-options">
+          <div class="field">
+            <label for="uploadCollection">上传到合集</label>
+            <input id="uploadCollection" type="text" list="collectionOptions" placeholder="例如：第一话、设定图、番外" value="未分组" />
+          </div>
+          <div class="field">
+            <label for="uploadStartOrder">起始排序号</label>
+            <input id="uploadStartOrder" type="number" step="1" min="0" placeholder="自动" />
+          </div>
+        </div>
         <input class="hidden-input" id="fileInput" type="file" accept="image/*" multiple />
         <button class="btn" type="button" id="pickFilesBtn">选择图片</button>
+        <datalist id="collectionOptions"></datalist>
       </div>
       <div class="progress-wrap" id="progressWrap">
         <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
@@ -543,13 +571,16 @@
 
     <section class="panel toolbar">
       <input id="searchInput" type="search" placeholder="搜索漫画文件名…" />
+      <select id="collectionFilter" aria-label="选择合集">
+        <option value="__all__">全部合集</option>
+      </select>
       <button class="btn ghost" id="refreshBtn" type="button">刷新列表</button>
       <button class="btn ghost" id="scrollTopBtn" type="button">回到顶部</button>
     </section>
 
     <section class="gallery" id="gallery" aria-live="polite"></section>
 
-    <footer>Made for Licoco · 图片由 Supabase 云端保存</footer>
+    <footer>由梨可可酱努力制作(*╹▽╹*)</footer>
   </main>
 
   <div class="modal" id="modal" role="dialog" aria-modal="true">
@@ -579,10 +610,10 @@
     const app = document.querySelector("#app");
     const gallery = document.querySelector("#gallery");
     const comicCount = document.querySelector("#comicCount");
+    const collectionCount = document.querySelector("#collectionCount");
     const latestDate = document.querySelector("#latestDate");
-    const loginForm = document.querySelector("#loginForm");
-    const emailInput = document.querySelector("#email");
-    const passwordInput = document.querySelector("#password");
+    const adminStatus = document.querySelector("#adminStatus");
+    const adminLoginLink = document.querySelector("#adminLoginLink");
     const logoutBtn = document.querySelector("#logoutBtn");
     const loginDot = document.querySelector("#loginDot");
     const loginStatus = document.querySelector("#loginStatus");
@@ -590,10 +621,14 @@
     const dropzone = document.querySelector("#dropzone");
     const fileInput = document.querySelector("#fileInput");
     const pickFilesBtn = document.querySelector("#pickFilesBtn");
+    const uploadCollectionInput = document.querySelector("#uploadCollection");
+    const uploadStartOrderInput = document.querySelector("#uploadStartOrder");
+    const collectionOptions = document.querySelector("#collectionOptions");
     const progressWrap = document.querySelector("#progressWrap");
     const progressFill = document.querySelector("#progressFill");
     const progressText = document.querySelector("#progressText");
     const searchInput = document.querySelector("#searchInput");
+    const collectionFilter = document.querySelector("#collectionFilter");
     const refreshBtn = document.querySelector("#refreshBtn");
     const scrollTopBtn = document.querySelector("#scrollTopBtn");
     const modal = document.querySelector("#modal");
@@ -640,6 +675,66 @@
       return cleaned || fallback;
     }
 
+    function normalizeCollection(value) {
+      return (value || "").trim() || "未分组";
+    }
+
+    function getCollectionNames() {
+      return [...new Set(comics.map(comic => normalizeCollection(comic.collection)))]
+        .sort((a, b) => a.localeCompare(b, "zh-CN"));
+    }
+
+    function getSortOrder(comic, fallbackIndex = 0) {
+      const order = Number(comic.sort_order);
+      return Number.isFinite(order) ? order : Number.MAX_SAFE_INTEGER - fallbackIndex;
+    }
+
+    function sortComicList(list) {
+      return [...list].sort((a, b) => {
+        const collectionCompare = normalizeCollection(a.collection).localeCompare(normalizeCollection(b.collection), "zh-CN");
+        if (collectionCompare !== 0) return collectionCompare;
+        const orderCompare = getSortOrder(a) - getSortOrder(b);
+        if (orderCompare !== 0) return orderCompare;
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      });
+    }
+
+    function getNextSortOrder(collectionName) {
+      const targetCollection = normalizeCollection(collectionName);
+      const orders = comics
+        .filter(comic => normalizeCollection(comic.collection) === targetCollection)
+        .map(comic => Number(comic.sort_order))
+        .filter(Number.isFinite);
+      return orders.length === 0 ? 10 : Math.max(...orders) + 10;
+    }
+
+    function refreshCollectionControls() {
+      const names = getCollectionNames();
+      const currentFilter = collectionFilter.value || "__all__";
+
+      collectionOptions.innerHTML = "";
+      names.forEach(name => {
+        const option = document.createElement("option");
+        option.value = name;
+        collectionOptions.appendChild(option);
+      });
+
+      collectionFilter.innerHTML = "";
+      const allOption = document.createElement("option");
+      allOption.value = "__all__";
+      allOption.textContent = "全部合集";
+      collectionFilter.appendChild(allOption);
+
+      names.forEach(name => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        collectionFilter.appendChild(option);
+      });
+
+      collectionFilter.value = names.includes(currentFilter) ? currentFilter : "__all__";
+    }
+
     function isAdmin() {
       return currentUser?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     }
@@ -650,7 +745,10 @@
       uploadZone.classList.toggle("active", admin);
       loginDot.classList.toggle("online", admin);
       loginStatus.textContent = admin ? `已登录：${currentUser.email}` : "未登录";
+      adminStatus.style.display = admin ? "inline-flex" : "none";
+      adminLoginLink.style.display = admin ? "none" : "inline-flex";
       logoutBtn.disabled = !currentUser;
+      logoutBtn.style.display = currentUser ? "inline-flex" : "none";
     }
 
     async function restoreSession() {
@@ -661,6 +759,10 @@
         return;
       }
       currentUser = data.session?.user || null;
+      if (currentUser && !isAdmin()) {
+        await supabaseClient.auth.signOut();
+        currentUser = null;
+      }
       updateAdminUI();
     }
 
@@ -669,7 +771,9 @@
 
       const { data, error } = await supabaseClient
         .from(TABLE_NAME)
-        .select("id,title,file_path,public_url,created_at")
+        .select("id,title,file_path,public_url,collection,sort_order,created_at")
+        .order("collection", { ascending: true, nullsFirst: false })
+        .order("sort_order", { ascending: true, nullsFirst: false })
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -678,26 +782,33 @@
         return;
       }
 
-      comics = data || [];
+      comics = sortComicList(data || []);
+      refreshCollectionControls();
       renderComics();
     }
 
     function renderComics() {
       const keyword = searchInput.value.trim().toLowerCase();
+      const activeCollection = collectionFilter.value || "__all__";
       const filtered = comics.filter(comic => {
         const title = (comic.title || "").toLowerCase();
-        return title.includes(keyword);
+        const collection = normalizeCollection(comic.collection);
+        const matchesKeyword = title.includes(keyword) || collection.toLowerCase().includes(keyword);
+        const matchesCollection = activeCollection === "__all__" || collection === activeCollection;
+        return matchesKeyword && matchesCollection;
       });
 
       comicCount.textContent = String(comics.length);
-      latestDate.textContent = comics[0]?.created_at ? formatDate(comics[0].created_at, "day") : "—";
+      collectionCount.textContent = String(getCollectionNames().length);
+      const latestComic = [...comics].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))[0];
+      latestDate.textContent = latestComic?.created_at ? formatDate(latestComic.created_at, "day") : "—";
 
       gallery.innerHTML = "";
 
       if (filtered.length === 0) {
         const empty = document.createElement("div");
         empty.className = "empty";
-        empty.textContent = comics.length === 0 ? "还没有漫画图片。管理员登录后上传第一张吧～" : "没有找到匹配的图片。";
+        empty.textContent = comics.length === 0 ? "还没有漫画图片。管理员登录后上传第一张吧～" : "没有找到匹配的图片或合集。";
         gallery.appendChild(empty);
         return;
       }
@@ -716,6 +827,11 @@
         const meta = document.createElement("div");
         meta.className = "comic-meta";
 
+        const badge = document.createElement("span");
+        badge.className = "comic-badge";
+        const orderText = Number.isFinite(Number(comic.sort_order)) ? ` · 排序 ${comic.sort_order}` : "";
+        badge.textContent = `${normalizeCollection(comic.collection)}${orderText}`;
+
         const title = document.createElement("p");
         title.className = "comic-title";
         title.textContent = comic.title || "未命名漫画";
@@ -726,6 +842,24 @@
 
         const actions = document.createElement("div");
         actions.className = "card-actions";
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "small-btn";
+        editBtn.type = "button";
+        editBtn.textContent = "编辑";
+        editBtn.addEventListener("click", () => editComic(comic));
+
+        const moveUpBtn = document.createElement("button");
+        moveUpBtn.className = "small-btn";
+        moveUpBtn.type = "button";
+        moveUpBtn.textContent = "上移";
+        moveUpBtn.addEventListener("click", () => moveComic(comic, -1));
+
+        const moveDownBtn = document.createElement("button");
+        moveDownBtn.className = "small-btn";
+        moveDownBtn.type = "button";
+        moveDownBtn.textContent = "下移";
+        moveDownBtn.addEventListener("click", () => moveComic(comic, 1));
 
         const openBtn = document.createElement("button");
         openBtn.className = "small-btn";
@@ -739,8 +873,8 @@
         deleteBtn.textContent = "删除";
         deleteBtn.addEventListener("click", () => deleteComic(comic));
 
-        actions.append(openBtn, deleteBtn);
-        meta.append(title, date, actions);
+        actions.append(editBtn, moveUpBtn, moveDownBtn, openBtn, deleteBtn);
+        meta.append(badge, title, date, actions);
         card.append(img, meta);
         gallery.appendChild(card);
       });
@@ -758,6 +892,90 @@
       modalImage.removeAttribute("src");
     }
 
+    async function updateComic(comic, patch) {
+      if (!isAdmin()) {
+        showToast("只有管理员可以修改图片信息。");
+        return false;
+      }
+
+      const { error } = await supabaseClient
+        .from(TABLE_NAME)
+        .update(patch)
+        .eq("id", comic.id);
+
+      if (error) {
+        console.error(error);
+        showToast("保存失败：" + error.message);
+        return false;
+      }
+
+      return true;
+    }
+
+    async function editComic(comic) {
+      if (!isAdmin()) {
+        showToast("请先用管理员账号登录。");
+        return;
+      }
+
+      const title = prompt("图片标题", comic.title || "");
+      if (title === null) return;
+
+      const collection = prompt("合集名称", normalizeCollection(comic.collection));
+      if (collection === null) return;
+
+      const currentOrder = Number.isFinite(Number(comic.sort_order)) ? String(comic.sort_order) : String(getNextSortOrder(collection));
+      const orderInput = prompt("排序号（数字越小越靠前）", currentOrder);
+      if (orderInput === null) return;
+
+      const sortOrder = Number.parseInt(orderInput, 10);
+      if (!Number.isFinite(sortOrder)) {
+        showToast("排序号需要填写数字。");
+        return;
+      }
+
+      const ok = await updateComic(comic, {
+        title: title.trim() || comic.title || "未命名漫画",
+        collection: normalizeCollection(collection),
+        sort_order: sortOrder
+      });
+
+      if (ok) {
+        showToast("图片信息已保存。");
+        await loadComics();
+      }
+    }
+
+    async function moveComic(comic, direction) {
+      if (!isAdmin()) {
+        showToast("请先用管理员账号登录。");
+        return;
+      }
+
+      const collection = normalizeCollection(comic.collection);
+      const list = comics
+        .filter(item => normalizeCollection(item.collection) === collection)
+        .sort((a, b) => getSortOrder(a) - getSortOrder(b));
+      const index = list.findIndex(item => item.id === comic.id);
+      const target = list[index + direction];
+
+      if (!target) {
+        showToast(direction < 0 ? "已经在这个合集最前面了。" : "已经在这个合集最后面了。");
+        return;
+      }
+
+      const currentOrder = Number.isFinite(Number(comic.sort_order)) ? Number(comic.sort_order) : (index + 1) * 10;
+      const targetOrder = Number.isFinite(Number(target.sort_order)) ? Number(target.sort_order) : (index + direction + 1) * 10;
+
+      const firstOk = await updateComic(comic, { sort_order: targetOrder });
+      if (!firstOk) return;
+      const secondOk = await updateComic(target, { sort_order: currentOrder });
+      if (!secondOk) return;
+
+      showToast("排序已更新。");
+      await loadComics();
+    }
+
     async function uploadFiles(fileList) {
       if (!isAdmin()) {
         showToast("请先用管理员账号登录，再上传漫画图片。");
@@ -773,6 +991,12 @@
       progressWrap.classList.add("show");
       progressFill.style.width = "0%";
       progressText.textContent = `准备上传 ${files.length} 张图片…`;
+
+      const uploadCollection = normalizeCollection(uploadCollectionInput.value);
+      let nextSortOrder = Number.parseInt(uploadStartOrderInput.value, 10);
+      if (!Number.isFinite(nextSortOrder)) {
+        nextSortOrder = getNextSortOrder(uploadCollection);
+      }
 
       let uploadedCount = 0;
       let failedCount = 0;
@@ -816,7 +1040,9 @@
           .insert({
             title: file.name,
             file_path: filePath,
-            public_url: publicUrlData.publicUrl
+            public_url: publicUrlData.publicUrl,
+            collection: uploadCollection,
+            sort_order: nextSortOrder
           });
 
         if (insertError) {
@@ -827,6 +1053,7 @@
         }
 
         uploadedCount++;
+        nextSortOrder += 10;
         const percent = Math.round((uploadedCount + failedCount) / files.length * 100);
         progressFill.style.width = `${percent}%`;
         progressText.textContent = `已处理 ${uploadedCount + failedCount}/${files.length} 张`;
@@ -835,6 +1062,8 @@
       fileInput.value = "";
       progressFill.style.width = "100%";
       progressText.textContent = `完成：成功 ${uploadedCount} 张，失败 ${failedCount} 张`;
+      uploadCollectionInput.value = uploadCollection;
+      uploadStartOrderInput.value = String(nextSortOrder);
       showToast(`上传完成：成功 ${uploadedCount} 张，失败 ${failedCount} 张。`);
       await loadComics();
     }
@@ -873,31 +1102,6 @@
       await loadComics();
     }
 
-    loginForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const email = emailInput.value.trim();
-      const password = passwordInput.value;
-
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) {
-        showToast("登录失败：" + error.message);
-        return;
-      }
-
-      currentUser = data.user || null;
-      if (!isAdmin()) {
-        await supabaseClient.auth.signOut();
-        currentUser = null;
-        updateAdminUI();
-        showToast("这个账号不是管理员账号，已自动退出。请使用指定管理员邮箱。");
-        return;
-      }
-
-      passwordInput.value = "";
-      updateAdminUI();
-      showToast("登录成功！现在可以上传漫画图片啦。💙");
-    });
-
     logoutBtn.addEventListener("click", async () => {
       await supabaseClient.auth.signOut();
       currentUser = null;
@@ -927,6 +1131,12 @@
     });
 
     searchInput.addEventListener("input", renderComics);
+    collectionFilter.addEventListener("change", renderComics);
+    uploadCollectionInput.addEventListener("change", () => {
+      if (!uploadStartOrderInput.value) {
+        uploadStartOrderInput.value = String(getNextSortOrder(uploadCollectionInput.value));
+      }
+    });
     refreshBtn.addEventListener("click", loadComics);
     scrollTopBtn.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
     closeModalBtn.addEventListener("click", closeModal);
@@ -937,8 +1147,12 @@
       if (event.key === "Escape") closeModal();
     });
 
-    supabaseClient.auth.onAuthStateChange((_event, session) => {
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       currentUser = session?.user || null;
+      if (currentUser && !isAdmin()) {
+        await supabaseClient.auth.signOut();
+        currentUser = null;
+      }
       updateAdminUI();
     });
 
