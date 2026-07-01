@@ -223,6 +223,19 @@
       font-size: 20px;
     }
 
+    .status-text {
+      margin: 14px 0 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+
+    .status-text.strong {
+      color: var(--primary-dark);
+      font-weight: 800;
+    }
+
     .form-row {
       display: grid;
       grid-template-columns: 1fr 130px;
@@ -477,6 +490,7 @@
           </div>
         </div>
       </div>
+      <p class="status-text" id="adminFeedback">管理员工具已就绪。</p>
     </section>
 
     <section class="content" id="content">
@@ -507,6 +521,8 @@
     const BUCKET_NAME = "comics";
     const TABLE_NAME = "fan_images";
     const MAX_FILE_MB = 30;
+    const REQUEST_TIMEOUT_MS = 15000;
+    const UPLOAD_TIMEOUT_MS = 30000;
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -525,6 +541,7 @@
     const progressWrap = document.querySelector("#progressWrap");
     const progressFill = document.querySelector("#progressFill");
     const progressText = document.querySelector("#progressText");
+    const adminFeedback = document.querySelector("#adminFeedback");
     const content = document.querySelector("#content");
     const gallery = document.querySelector("#gallery");
     const modal = document.querySelector("#modal");
@@ -543,6 +560,106 @@
       toast.classList.add("show");
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => toast.classList.remove("show"), 3600);
+    }
+
+    function showAdminFeedback(message, strong = false) {
+      adminFeedback.textContent = message;
+      adminFeedback.classList.toggle("strong", strong);
+      showToast(message);
+    }
+
+    function nextFrame() {
+      return new Promise(resolve => {
+        const timerId = setTimeout(resolve, 80);
+        requestAnimationFrame(() => {
+          clearTimeout(timerId);
+          resolve();
+        });
+      });
+    }
+
+    function withTimeout(promise, timeoutMs, label) {
+      let timerId;
+      const timeout = new Promise((_, reject) => {
+        timerId = setTimeout(() => {
+          reject(new Error(`${label}超时，可能是网络、Supabase 权限或表结构还没有配置好。`));
+        }, timeoutMs);
+      });
+
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timerId));
+    }
+
+    function errorMessage(error) {
+      return error?.message || String(error || "未知错误");
+    }
+
+    function sha256Hex(value) {
+      const bytes = new TextEncoder().encode(value);
+      const words = [];
+      const k = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+      ];
+      const h = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+      ];
+
+      for (let i = 0; i < bytes.length; i++) {
+        words[i >> 2] |= bytes[i] << (24 - (i % 4) * 8);
+      }
+      words[bytes.length >> 2] |= 0x80 << (24 - (bytes.length % 4) * 8);
+      words[(((bytes.length + 8) >> 6) << 4) + 15] = bytes.length * 8;
+
+      const rightRotate = (number, shift) => (number >>> shift) | (number << (32 - shift));
+      const w = new Array(64);
+
+      for (let i = 0; i < words.length; i += 16) {
+        let [a, b, c, d, e, f, g, hash] = h;
+
+        for (let j = 0; j < 64; j++) {
+          if (j < 16) {
+            w[j] = words[i + j] | 0;
+          } else {
+            const gamma0 = rightRotate(w[j - 15], 7) ^ rightRotate(w[j - 15], 18) ^ (w[j - 15] >>> 3);
+            const gamma1 = rightRotate(w[j - 2], 17) ^ rightRotate(w[j - 2], 19) ^ (w[j - 2] >>> 10);
+            w[j] = (w[j - 16] + gamma0 + w[j - 7] + gamma1) | 0;
+          }
+
+          const ch = (e & f) ^ (~e & g);
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const sigma0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+          const sigma1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+          const t1 = (hash + sigma1 + ch + k[j] + w[j]) | 0;
+          const t2 = (sigma0 + maj) | 0;
+
+          hash = g;
+          g = f;
+          f = e;
+          e = (d + t1) | 0;
+          d = c;
+          c = b;
+          b = a;
+          a = (t1 + t2) | 0;
+        }
+
+        h[0] = (h[0] + a) | 0;
+        h[1] = (h[1] + b) | 0;
+        h[2] = (h[2] + c) | 0;
+        h[3] = (h[3] + d) | 0;
+        h[4] = (h[4] + e) | 0;
+        h[5] = (h[5] + f) | 0;
+        h[6] = (h[6] + g) | 0;
+        h[7] = (h[7] + hash) | 0;
+      }
+
+      return h.map(item => (item >>> 0).toString(16).padStart(8, "0")).join("");
     }
 
     function isAdmin() {
@@ -613,20 +730,34 @@
       let data;
       let error;
 
-      if (isAdmin()) {
-        const result = await supabaseClient
-          .from(TABLE_NAME)
-          .select("id,title,file_path,public_url,sort_order,created_at")
-          .order("sort_order", { ascending: true })
-          .order("created_at", { ascending: false });
-        data = result.data;
-        error = result.error;
-      } else {
-        const result = await supabaseClient.rpc("get_fan_images", {
-          access_password: fanPassword
-        });
-        data = result.data;
-        error = result.error;
+      try {
+        if (isAdmin()) {
+          const result = await withTimeout(
+            supabaseClient
+              .from(TABLE_NAME)
+              .select("id,title,file_path,public_url,sort_order,created_at")
+              .order("sort_order", { ascending: true })
+              .order("created_at", { ascending: false }),
+            REQUEST_TIMEOUT_MS,
+            "读取特典图片"
+          );
+          data = result.data;
+          error = result.error;
+        } else {
+          const result = await withTimeout(
+            supabaseClient.rpc("get_fan_images", {
+              access_password: fanPassword
+            }),
+            REQUEST_TIMEOUT_MS,
+            "读取特典图片"
+          );
+          data = result.data;
+          error = result.error;
+        }
+      } catch (requestError) {
+        console.error(requestError);
+        gallery.innerHTML = `<div class="empty">读取失败：${errorMessage(requestError)}<br>请检查网络、Supabase 表和 RLS 策略。</div>`;
+        return;
       }
 
       if (error) {
@@ -718,14 +849,24 @@
         return false;
       }
 
-      const { error } = await supabaseClient
-        .from(TABLE_NAME)
-        .update(patch)
-        .eq("id", item.id);
+      let error;
+      try {
+        const result = await withTimeout(
+          supabaseClient
+            .from(TABLE_NAME)
+            .update(patch)
+            .eq("id", item.id),
+          REQUEST_TIMEOUT_MS,
+          "保存图片信息"
+        );
+        error = result.error;
+      } catch (requestError) {
+        error = requestError;
+      }
 
       if (error) {
         console.error(error);
-        showToast("保存失败：" + error.message);
+        showToast("保存失败：" + errorMessage(error));
         return false;
       }
 
@@ -765,24 +906,44 @@
       const ok = confirm(`确定删除「${item.title || "这张特典图片"}」吗？`);
       if (!ok) return;
 
-      const { error: storageError } = await supabaseClient.storage
-        .from(BUCKET_NAME)
-        .remove([item.file_path]);
+      let storageError;
+      try {
+        const storageResult = await withTimeout(
+          supabaseClient.storage
+            .from(BUCKET_NAME)
+            .remove([item.file_path]),
+          REQUEST_TIMEOUT_MS,
+          "删除云端图片"
+        );
+        storageError = storageResult.error;
+      } catch (requestError) {
+        storageError = requestError;
+      }
 
       if (storageError) {
         console.error(storageError);
-        showToast("删除云端图片失败：" + storageError.message);
+        showToast("删除云端图片失败：" + errorMessage(storageError));
         return;
       }
 
-      const { error: deleteError } = await supabaseClient
-        .from(TABLE_NAME)
-        .delete()
-        .eq("id", item.id);
+      let deleteError;
+      try {
+        const deleteResult = await withTimeout(
+          supabaseClient
+            .from(TABLE_NAME)
+            .delete()
+            .eq("id", item.id),
+          REQUEST_TIMEOUT_MS,
+          "删除数据库记录"
+        );
+        deleteError = deleteResult.error;
+      } catch (requestError) {
+        deleteError = requestError;
+      }
 
       if (deleteError) {
         console.error(deleteError);
-        showToast("删除数据库记录失败：" + deleteError.message);
+        showToast("删除数据库记录失败：" + errorMessage(deleteError));
         return;
       }
 
@@ -792,19 +953,21 @@
 
     async function uploadFiles(fileList) {
       if (!isAdmin()) {
-        showToast("请先用管理员账号登录。");
+        showAdminFeedback("请先用管理员账号登录。");
         return;
       }
 
       const files = Array.from(fileList || []).filter(file => file.type.startsWith("image/"));
       if (files.length === 0) {
-        showToast("请选择图片文件。");
+        showAdminFeedback("请选择图片文件。");
         return;
       }
 
       progressWrap.classList.add("show");
       progressFill.style.width = "0%";
       progressText.textContent = `准备上传 ${files.length} 张图片…`;
+      showAdminFeedback(`准备上传 ${files.length} 张特典图片…`, true);
+      await nextFrame();
 
       let nextSortOrder = Number.parseInt(uploadOrder.value, 10);
       if (!Number.isFinite(nextSortOrder)) {
@@ -818,7 +981,7 @@
         const sizeMb = file.size / 1024 / 1024;
         if (sizeMb > MAX_FILE_MB) {
           failedCount++;
-          showToast(`${file.name} 太大啦，单张图片建议小于 ${MAX_FILE_MB}MB。`);
+          showAdminFeedback(`${file.name} 太大啦，单张图片建议小于 ${MAX_FILE_MB}MB。`);
           continue;
         }
 
@@ -828,19 +991,31 @@
         const filePath = `fan-specials/${day}/${Date.now()}-${id}-${safeName}`;
 
         progressText.textContent = `正在上传：${file.name}`;
+        showAdminFeedback(`正在上传到 Supabase Storage：${file.name}`, true);
+        await nextFrame();
 
-        const { error: uploadError } = await supabaseClient.storage
-          .from(BUCKET_NAME)
-          .upload(filePath, file, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: file.type
-          });
+        let uploadError;
+        try {
+          const uploadResult = await withTimeout(
+            supabaseClient.storage
+              .from(BUCKET_NAME)
+              .upload(filePath, file, {
+                cacheControl: "3600",
+                upsert: false,
+                contentType: file.type
+              }),
+            UPLOAD_TIMEOUT_MS,
+            "上传图片"
+          );
+          uploadError = uploadResult.error;
+        } catch (requestError) {
+          uploadError = requestError;
+        }
 
         if (uploadError) {
           failedCount++;
           console.error(uploadError);
-          showToast(`上传失败：${file.name}\n${uploadError.message}`);
+          showAdminFeedback(`上传到 Storage 失败：${file.name}\n${errorMessage(uploadError)}`);
           continue;
         }
 
@@ -849,19 +1024,33 @@
           .getPublicUrl(filePath);
 
         const customTitle = uploadTitle.value.trim();
-        const { error: insertError } = await supabaseClient
-          .from(TABLE_NAME)
-          .insert({
-            title: customTitle ? `${customTitle} ${uploadedCount + 1}` : file.name,
-            file_path: filePath,
-            public_url: publicUrlData.publicUrl,
-            sort_order: nextSortOrder
-          });
+        progressText.textContent = `正在保存数据库记录：${file.name}`;
+        showAdminFeedback(`图片已上传，正在保存数据库记录：${file.name}`, true);
+        await nextFrame();
+
+        let insertError;
+        try {
+          const insertResult = await withTimeout(
+            supabaseClient
+              .from(TABLE_NAME)
+              .insert({
+                title: customTitle ? `${customTitle} ${uploadedCount + 1}` : file.name,
+                file_path: filePath,
+                public_url: publicUrlData.publicUrl,
+                sort_order: nextSortOrder
+              }),
+            REQUEST_TIMEOUT_MS,
+            "保存图片记录"
+          );
+          insertError = insertResult.error;
+        } catch (requestError) {
+          insertError = requestError;
+        }
 
         if (insertError) {
           failedCount++;
           console.error(insertError);
-          showToast(`图片已上传，但记录保存失败：${file.name}\n${insertError.message}`);
+          showAdminFeedback(`图片已上传，但数据库记录保存失败：${file.name}\n${errorMessage(insertError)}\n请确认已重新运行新版 supabase-setup.sql。`);
           continue;
         }
 
@@ -876,57 +1065,95 @@
       uploadOrder.value = String(nextSortOrder);
       progressFill.style.width = "100%";
       progressText.textContent = `完成：成功 ${uploadedCount} 张，失败 ${failedCount} 张`;
-      showToast(`上传完成：成功 ${uploadedCount} 张，失败 ${failedCount} 张。`);
+      showAdminFeedback(`上传完成：成功 ${uploadedCount} 张，失败 ${failedCount} 张。`, failedCount === 0);
       await loadFanImages();
     }
 
     gateForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       enterBtn.disabled = true;
-      fanPassword = fanPasswordInput.value;
+      enterBtn.textContent = "正在校验…";
 
-      const { data, error } = await supabaseClient.rpc("verify_fan_password", {
-        access_password: fanPassword
-      });
+      try {
+        await nextFrame();
+        fanPassword = sha256Hex(fanPasswordInput.value);
 
-      if (error) {
-        console.error(error);
-        showToast("校验失败：" + error.message);
+        const { data, error } = await withTimeout(
+          supabaseClient.rpc("verify_fan_password", {
+            access_password: fanPassword
+          }),
+          REQUEST_TIMEOUT_MS,
+          "校验访问密码"
+        );
+
+        if (error) {
+          console.error(error);
+          showToast("校验失败：" + errorMessage(error));
+          return;
+        }
+
+        if (!data) {
+          showToast("密码不正确，或者管理员还没有设置密码。");
+          return;
+        }
+
+        unlockPage();
+        showToast("欢迎进入充电特典页。");
+        await loadFanImages();
+      } catch (requestError) {
+        console.error(requestError);
+        showToast("校验失败：" + errorMessage(requestError));
+      } finally {
         enterBtn.disabled = false;
-        return;
+        enterBtn.textContent = "进入特典页";
       }
-
-      if (!data) {
-        showToast("密码不正确，或者管理员还没有设置密码。");
-        enterBtn.disabled = false;
-        return;
-      }
-
-      unlockPage();
-      showToast("欢迎进入充电特典页。");
-      await loadFanImages();
-      enterBtn.disabled = false;
     });
 
     passwordForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const submitButton = passwordForm.querySelector("button[type='submit']");
       if (!isAdmin()) {
-        showToast("请先用管理员账号登录。");
+        showAdminFeedback("请先用管理员账号登录。");
         return;
       }
 
-      const { error } = await supabaseClient.rpc("set_fan_password", {
-        new_password: newFanPassword.value
-      });
-
-      if (error) {
-        console.error(error);
-        showToast("保存密码失败：" + error.message);
+      if (newFanPassword.value.length < 4) {
+        showAdminFeedback("密码至少需要 4 位。");
         return;
       }
 
-      newFanPassword.value = "";
-      showToast("充电粉丝访问密码已更新。");
+      submitButton.disabled = true;
+
+      try {
+        showAdminFeedback("正在生成密码校验信息…", true);
+        await nextFrame();
+        const passwordHash = sha256Hex(newFanPassword.value);
+
+        showAdminFeedback("正在保存访问密码到 Supabase…", true);
+        await nextFrame();
+
+        const { error } = await withTimeout(
+          supabaseClient.rpc("set_fan_password", {
+            new_password: passwordHash
+          }),
+          REQUEST_TIMEOUT_MS,
+          "保存访问密码"
+        );
+
+        if (error) {
+          console.error(error);
+          showAdminFeedback("保存密码失败：" + errorMessage(error) + "\n请确认已重新运行新版 supabase-setup.sql。");
+          return;
+        }
+
+        newFanPassword.value = "";
+        showAdminFeedback("充电粉丝访问密码已更新。现在可以用这个密码进入特典页。", true);
+      } catch (requestError) {
+        console.error(requestError);
+        showAdminFeedback("保存密码失败：" + errorMessage(requestError) + "\n如果是超时，请检查网络和 Supabase 的 fan_settings / set_fan_password 是否已创建。");
+      } finally {
+        submitButton.disabled = false;
+      }
     });
 
     pickFilesBtn.addEventListener("click", () => fileInput.click());
@@ -946,12 +1173,16 @@
         currentUser = null;
       }
       updateAdminUI();
-      if (isAdmin()) await loadFanImages();
+      if (isAdmin()) {
+        showAdminFeedback("管理员已登录，可以设置密码和上传特典图片。", true);
+        await loadFanImages();
+      }
     });
 
     (async function init() {
       await restoreSession();
       if (isAdmin()) {
+        showAdminFeedback("管理员已登录，可以设置密码和上传特典图片。", true);
         await loadFanImages();
       }
     })();
